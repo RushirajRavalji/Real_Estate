@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/property.dart';
+import '../data/properties.dart';
 
 class PropertyService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -14,17 +15,67 @@ class PropertyService {
   CollectionReference get _propertiesCollection =>
       _firestore.collection('properties');
 
+  // Check if properties collection is empty and seed with sample data
+  Future<void> checkAndSeedProperties() async {
+    try {
+      // Check if collection is empty
+      final snapshot = await _propertiesCollection.limit(1).get();
+
+      if (snapshot.docs.isEmpty) {
+        debugPrint('Seeding properties collection with sample data...');
+
+        // Add sample properties from the properties.dart file
+        for (var property in properties) {
+          await _propertiesCollection.add({
+            'title': property.title,
+            'description': property.description,
+            'price': property.price,
+            'address': property.address,
+            'city': property.city,
+            'state': property.state,
+            'zipCode': property.zipCode,
+            'type': property.type,
+            'status': property.status,
+            'bedrooms': property.bedrooms,
+            'bathrooms': property.bathrooms,
+            'squareFeet': property.squareFeet,
+            'images': property.images,
+            'isFeatured': property.isFeatured ?? false,
+            'userId': _auth.currentUser?.uid,
+            'createdAt': Timestamp.now(),
+          });
+        }
+
+        debugPrint(
+          'Successfully seeded properties collection with ${properties.length} properties',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error seeding properties: $e');
+    }
+  }
+
   // Get stream of all properties
   Stream<List<Property>> getPropertiesStream() {
-    return _propertiesCollection
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            return Property.fromMap({...data, 'id': doc.id});
-          }).toList();
-        });
+    try {
+      debugPrint('Getting properties stream...');
+      // First check if we need to seed data
+      checkAndSeedProperties();
+
+      return _propertiesCollection.snapshots().map((snapshot) {
+        final list =
+            snapshot.docs.map((doc) {
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              return Property.fromMap({...data, 'id': doc.id});
+            }).toList();
+
+        debugPrint('Retrieved ${list.length} properties from Firestore');
+        return list;
+      });
+    } catch (e) {
+      debugPrint('Error in getPropertiesStream: $e');
+      return Stream.value([]);
+    }
   }
 
   // Get properties by type (sale/rent)
@@ -48,16 +99,20 @@ class PropertyService {
       return Stream.value([]);
     }
 
-    return _propertiesCollection
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            return Property.fromMap({...data, 'id': doc.id});
-          }).toList();
-        });
+    try {
+      return _propertiesCollection
+          .where('userId', isEqualTo: userId)
+          .snapshots()
+          .map((snapshot) {
+            return snapshot.docs.map((doc) {
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              return Property.fromMap({...data, 'id': doc.id});
+            }).toList();
+          });
+    } catch (e) {
+      debugPrint('Error in getMyPropertiesStream: $e');
+      return Stream.value([]);
+    }
   }
 
   // Get a property by ID

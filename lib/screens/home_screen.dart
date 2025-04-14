@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_drawer.dart';
+import '../services/property_service.dart';
 import 'property_listing_screen.dart';
+import 'property_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   static const routeName = '/home';
@@ -13,6 +15,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final PropertyService _propertyService = PropertyService();
 
   final _propertyTypes = [
     'All Properties',
@@ -29,6 +32,18 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _minPriceController = TextEditingController();
   final TextEditingController _maxPriceController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize property data when home screen loads
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    // Initialize properties collection if empty
+    await _propertyService.checkAndSeedProperties();
+  }
 
   @override
   void dispose() {
@@ -223,6 +238,44 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+
+            // Featured Properties section
+            _buildFeaturedProperties(isSmallScreen),
+
+            // Browse More button
+            Padding(
+              padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
+              child: Center(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PropertyListingScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6A38F2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32.0,
+                      vertical: 16.0,
+                    ),
+                  ),
+                  child: const Text(
+                    'Browse All Properties',
+                    style: TextStyle(
+                      fontSize: 16.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Add some spacing at the bottom
+            SizedBox(height: isSmallScreen ? 16.0 : 32.0),
           ],
         ),
       ),
@@ -529,6 +582,187 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: const Text('Search Properties'),
       ),
+    );
+  }
+
+  // Method to build the featured properties section
+  Widget _buildFeaturedProperties(bool isSmallScreen) {
+    return SizedBox(
+      height: 330,
+      child: StreamBuilder(
+        stream: _propertyService.getPropertiesStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final properties = snapshot.data ?? [];
+
+          if (properties.isEmpty) {
+            return const Center(child: Text('No properties available'));
+          }
+
+          // Take only the first 3-5 properties
+          final featuredProperties = properties.take(5).toList();
+
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 12.0 : 16.0,
+              vertical: 16.0,
+            ),
+            itemCount: featuredProperties.length,
+            itemBuilder: (context, index) {
+              final property = featuredProperties[index];
+              return _buildPropertyCard(context, property, isSmallScreen);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // Method to build a property card for the horizontal list
+  Widget _buildPropertyCard(
+    BuildContext context,
+    property,
+    bool isSmallScreen,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PropertyDetailScreen(property: property),
+          ),
+        );
+      },
+      child: Container(
+        width: 280,
+        margin: const EdgeInsets.only(right: 16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8.0,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Property image
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12.0),
+                topRight: Radius.circular(12.0),
+              ),
+              child: SizedBox(
+                height: 160,
+                width: double.infinity,
+                child:
+                    property.images.isNotEmpty
+                        ? property.images[0].startsWith('http')
+                            ? Image.network(
+                              property.images[0],
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Image.asset(
+                                  'assets/images/placeholder.png',
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            )
+                            : _propertyService.base64ToImage(property.images[0])
+                        : Image.asset(
+                          'assets/images/placeholder.png',
+                          fit: BoxFit.cover,
+                        ),
+              ),
+            ),
+
+            // Property details
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Property title
+                  Text(
+                    property.title,
+                    style: const TextStyle(
+                      fontSize: 16.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  const SizedBox(height: 4.0),
+
+                  // Property location
+                  Text(
+                    '${property.address}, ${property.city}',
+                    style: TextStyle(fontSize: 14.0, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  const SizedBox(height: 8.0),
+
+                  // Property price
+                  Text(
+                    property.type == 'rent'
+                        ? '₹${property.price.toStringAsFixed(0)}/month'
+                        : '₹${property.price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF6A38F2),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8.0),
+
+                  // Property features
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildFeature(Icons.bed, '${property.bedrooms} Beds'),
+                      _buildFeature(
+                        Icons.bathroom,
+                        '${property.bathrooms} Baths',
+                      ),
+                      _buildFeature(
+                        Icons.square_foot,
+                        '${property.squareFeet} sqft',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method to build a feature item
+  Widget _buildFeature(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16.0, color: Colors.grey[600]),
+        const SizedBox(width: 4.0),
+        Text(text, style: TextStyle(fontSize: 12.0, color: Colors.grey[600])),
+      ],
     );
   }
 }

@@ -13,34 +13,46 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase with platform-specific options
-  if (Platform.isWindows) {
-    // Use Firebase web SDK with custom config for Windows
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: "AIzaSyAG4C5XG1fXPQevAUW-NmcoZTlcIv2srFY",
-        authDomain: "real-estate-d048f.firebaseapp.com",
-        projectId: "real-estate-d048f",
-        storageBucket: "real-estate-d048f.firebasestorage.app",
-        messagingSenderId: "929916563236",
-        appId: "1:929916563236:web:05e752324d56132a2e4db1",
-        measurementId: "G-KKLZ8EQ0Q2",
-      ),
-    );
-  } else {
-    // Use default platform configurations for other platforms
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
+  debugPrint('Starting app initialization...');
 
-  // Set preferred orientations
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+  try {
+    // Initialize Firebase with platform-specific options
+    if (Platform.isWindows) {
+      debugPrint('Initializing Firebase for Windows...');
+      // Use Firebase web SDK with custom config for Windows
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: "AIzaSyAG4C5XG1fXPQevAUW-NmcoZTlcIv2srFY",
+          authDomain: "real-estate-d048f.firebaseapp.com",
+          projectId: "real-estate-d048f",
+          storageBucket: "real-estate-d048f.firebasestorage.app",
+          messagingSenderId: "929916563236",
+          appId: "1:929916563236:web:05e752324d56132a2e4db1",
+          measurementId: "G-KKLZ8EQ0Q2",
+        ),
+      );
+      debugPrint('Firebase for Windows initialized successfully');
+    } else {
+      debugPrint('Initializing Firebase for other platforms...');
+      // Use default platform configurations for other platforms
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      debugPrint('Firebase initialized successfully with platform options');
+    }
+
+    // Set preferred orientations
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+
+    debugPrint('App initialization completed successfully');
+  } catch (e) {
+    debugPrint('Error during initialization: $e');
+  }
 
   runApp(const MyApp());
 }
@@ -167,29 +179,86 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   bool _isLoggedIn = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _checkLoginStatus();
+
+    // Add a timeout to prevent indefinite loading
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted && _isLoading) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Loading timed out. Please restart the app.";
+        });
+      }
+    });
   }
 
   Future<void> _checkLoginStatus() async {
-    // Check if user is logged in
-    final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    final currentUser = FirebaseAuth.instance.currentUser;
+    try {
+      debugPrint('Checking login status...');
+      // Check if user is logged in
+      final prefs = await SharedPreferences.getInstance();
+      final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+      final currentUser = FirebaseAuth.instance.currentUser;
 
-    setState(() {
-      _isLoggedIn = isLoggedIn && currentUser != null;
-      _isLoading = false;
-    });
+      debugPrint('SharedPreferences isLoggedIn: $isLoggedIn');
+      debugPrint('Current user: ${currentUser?.uid ?? "null"}');
+
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = isLoggedIn && currentUser != null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking login status: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Error: $e";
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const SplashScreen();
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _errorMessage = null;
+                  });
+                  _checkLoginStatus();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return _isLoggedIn ? const HomeScreen() : const LoginScreen();

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/property.dart';
-import '../data/properties.dart';
+import '../services/property_service.dart';
 import '../widgets/app_drawer.dart';
 import 'property_detail_screen.dart';
 
@@ -13,6 +13,7 @@ class PropertyListingScreen extends StatefulWidget {
 
 class _PropertyListingScreenState extends State<PropertyListingScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final PropertyService _propertyService = PropertyService();
 
   @override
   Widget build(BuildContext context) {
@@ -47,37 +48,98 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
       ),
       drawer: const AppDrawer(), // Changed to standard drawer (from top)
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Property Listings Header
-              Padding(
-                padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-                child: Text(
-                  'Property Listings',
-                  style: TextStyle(
-                    fontSize: isSmallScreen ? 20 : 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
+        child: StreamBuilder<List<Property>>(
+          stream: _propertyService.getPropertiesStream(),
+          builder: (context, snapshot) {
+            debugPrint(
+              'Property listing stream state: ${snapshot.connectionState}',
+            );
 
-              // Property List - responsive grid for larger screens
-              if (isSmallScreen)
-                _buildListView()
-              else
-                _buildGridView(isMediumScreen ? 2 : 3),
-            ],
-          ),
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              debugPrint('Error in property listing: ${snapshot.error}');
+              return Center(
+                child: Text(
+                  'Error loading properties: ${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              );
+            }
+
+            final properties = snapshot.data ?? [];
+            debugPrint('Properties loaded: ${properties.length}');
+
+            if (properties.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.home_work_outlined,
+                      size: 80,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No properties available at the moment',
+                      style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Refresh the page
+                        setState(() {});
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6A38F2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                      child: const Text('Refresh'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Property Listings Header
+                  Padding(
+                    padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                    child: Text(
+                      'Property Listings',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 20 : 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+
+                  // Property List - responsive grid for larger screens
+                  if (isSmallScreen)
+                    _buildListView(properties)
+                  else
+                    _buildGridView(properties, isMediumScreen ? 2 : 3),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
   // List view for small screens
-  Widget _buildListView() {
+  Widget _buildListView(List<Property> properties) {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -89,7 +151,7 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
   }
 
   // Grid view for larger screens
-  Widget _buildGridView(int crossAxisCount) {
+  Widget _buildGridView(List<Property> properties, int crossAxisCount) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: GridView.builder(
@@ -111,90 +173,96 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
 
   // Property card for list view
   Widget _buildPropertyCard(BuildContext context, Property property) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16.0, left: 16.0, right: 16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16, left: 12, right: 12),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Property Image with Tags
+          // Property image with tags
           Stack(
             children: [
-              // Property Image
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
-                ),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Image.network(
-                    property.images.isNotEmpty
-                        ? '${property.images[0]}?auto=format&fit=crop&w=500&q=80'
-                        : 'https://via.placeholder.com/500x300?text=No+Image',
-                    fit: BoxFit.cover,
+              // Property image
+              SizedBox(
+                height: 200,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
                   ),
-                ),
-              ),
-
-              // Featured Tag
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6A38F2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Featured',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child:
+                      property.images.isNotEmpty
+                          ? property.images[0].startsWith('http')
+                              ? Image.network(
+                                property.images[0],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    'assets/images/placeholder.png',
+                                    fit: BoxFit.cover,
+                                  );
+                                },
+                              )
+                              : _propertyService.base64ToImage(
+                                property.images[0],
+                              )
+                          : Image.asset(
+                            'assets/images/placeholder.png',
+                            fit: BoxFit.cover,
+                          ),
                 ),
               ),
 
-              // For Sale/Rent Tag
+              // Tags - Featured and For Sale/Rent
               Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    property.type == 'rent' ? 'For Rent' : 'For Sale',
-                    style: TextStyle(
-                      color:
-                          property.type == 'rent'
-                              ? Colors.indigo[600]
-                              : Colors.red[600],
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                top: 12,
+                left: 12,
+                child: Row(
+                  children: [
+                    if (property.isFeatured)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Featured',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            property.type == 'sale'
+                                ? Colors.blue
+                                : Colors.green,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        property.type == 'sale' ? 'For Sale' : 'For Rent',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -313,73 +381,104 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
     );
   }
 
-  // Property card for grid view
+  // Property card for grid view (more compact)
   Widget _buildPropertyCardGrid(BuildContext context, Property property) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Property Image with Tags
-          Expanded(
-            flex: 5,
-            child: Stack(
-              children: [
-                // Property Image
-                ClipRRect(
+          // Property image with price tag
+          Stack(
+            children: [
+              // Property image
+              SizedBox(
+                height: 140,
+                width: double.infinity,
+                child: ClipRRect(
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Image.network(
+                  child:
                       property.images.isNotEmpty
-                          ? '${property.images[0]}?auto=format&fit=crop&w=500&q=80'
-                          : 'https://via.placeholder.com/500x300?text=No+Image',
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                          ? property.images[0].startsWith('http')
+                              ? Image.network(
+                                property.images[0],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    'assets/images/placeholder.png',
+                                    fit: BoxFit.cover,
+                                  );
+                                },
+                              )
+                              : _propertyService.base64ToImage(
+                                property.images[0],
+                              )
+                          : Image.asset(
+                            'assets/images/placeholder.png',
+                            fit: BoxFit.cover,
+                          ),
                 ),
+              ),
 
-                // For Sale/Rent Tag
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+              // Price tag
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
                     ),
-                    decoration: BoxDecoration(
+                  ),
+                  child: Text(
+                    property.type == 'rent'
+                        ? '₹${property.price.toStringAsFixed(0)}/month'
+                        : '₹${property.price.toStringAsFixed(0)}',
+                    style: const TextStyle(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: Text(
-                      property.type == 'rent' ? 'For Rent' : 'For Sale',
-                      style: TextStyle(
-                        color:
-                            property.type == 'rent'
-                                ? Colors.indigo[600]
-                                : Colors.red[600],
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+
+              // Tags - For Sale/Rent
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: property.type == 'sale' ? Colors.blue : Colors.green,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    property.type == 'sale' ? 'Sale' : 'Rent',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
 
           // Property Details
@@ -390,20 +489,6 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Price
-                  Text(
-                    property.type == 'rent'
-                        ? '₹${property.price.toStringAsFixed(0)}/month'
-                        : '₹${property.price.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF6A38F2),
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
                   // Title
                   Text(
                     property.title,

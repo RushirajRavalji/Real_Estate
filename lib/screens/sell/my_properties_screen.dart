@@ -175,9 +175,11 @@ class _MyPropertiesScreenState extends State<MyPropertiesScreen> {
                         image: DecorationImage(
                           image:
                               property.images.isNotEmpty
-                                  ? _propertyService
-                                      .base64ToImage(property.images[0])
-                                      .image
+                                  ? property.images[0].startsWith('http')
+                                      ? NetworkImage(property.images[0])
+                                      : _propertyService
+                                          .base64ToImage(property.images[0])
+                                          .image
                                   : const AssetImage(
                                     'assets/images/placeholder.png',
                                   ),

@@ -8,7 +8,7 @@ class PropertyDetailScreen extends StatefulWidget {
   final Property property;
 
   const PropertyDetailScreen({Key? key, required this.property})
-      : super(key: key);
+    : super(key: key);
 
   @override
   _PropertyDetailScreenState createState() => _PropertyDetailScreenState();
@@ -43,11 +43,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   String createWhatsAppMessage() {
     final message = '''
-Hello Jayendra, 
+Hello, I'm interested in the property: ${widget.property.title}.
 
-I'm interested in the property: ${widget.property.title} (ID: ${widget.property.id})
-Location: ${widget.property.address}, ${widget.property.city}, ${widget.property.state}
-Price: ₹${widget.property.price.toStringAsFixed(0)}
+Location: ${widget.property.address}, ${widget.property.city}
+Price: ${widget.property.price.toStringAsFixed(0)}
 Type: ${widget.property.type == 'rent' ? 'For Rent' : 'For Sale'}
 
 My details:
@@ -55,7 +54,7 @@ Name: ${_nameController.text}
 Email: ${_emailController.text}
 Phone: ${_phoneController.text}
 
-Message: ${_messageController.text}
+${_messageController.text}
 
 Thank you!
 ''';
@@ -64,45 +63,70 @@ Thank you!
   }
 
   Future<void> _sendWhatsAppMessage() async {
-    // Try multiple approaches to launch WhatsApp
     try {
-      // Agent's WhatsApp number
+      // Agent's WhatsApp number (with country code, no + or spaces)
       const agentPhone = "916354450316";
-      
-      // Different URL formats
-      final whatsappUrl = "https://wa.me/$agentPhone?text=${createWhatsAppMessage()}";
-      final whatsappMobile = "whatsapp://send?phone=$agentPhone?text=${createWhatsAppMessage()}";
-      final whatsappWeb = "https://web.whatsapp.com/send?phone=$agentPhone&text=${createWhatsAppMessage()}";
 
-      final Uri mobileUri = Uri.parse(whatsappMobile);
-      final Uri webUri = Uri.parse(whatsappWeb);
-      final Uri defaultUri = Uri.parse(whatsappUrl);
+      // Create the message text
+      final messageText = createWhatsAppMessage();
 
-      bool launched = false;
-      
-      // First try mobile deep link
-      if (await canLaunchUrl(mobileUri)) {
-        await launchUrl(mobileUri, mode: LaunchMode.externalApplication);
-        launched = true;
-      } 
-      // Then try web version
-      else if (await canLaunchUrl(webUri)) {
-        await launchUrl(webUri, mode: LaunchMode.externalApplication);
-        launched = true;
-      } 
-      // Finally try default URL
-      else if (await canLaunchUrl(defaultUri)) {
-        await launchUrl(defaultUri, mode: LaunchMode.externalApplication);
-        launched = true;
+      // Different URL formats for different platforms
+      final whatsappUrl = "https://wa.me/$agentPhone?text=$messageText";
+
+      // Create URI
+      final Uri uri = Uri.parse(whatsappUrl);
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback for web
+        final webUrl =
+            "https://web.whatsapp.com/send?phone=$agentPhone&text=$messageText";
+        final webUri = Uri.parse(webUrl);
+
+        if (await canLaunchUrl(webUri)) {
+          await launchUrl(
+            webUri,
+            mode: LaunchMode.externalNonBrowserApplication,
+          );
+        } else {
+          throw 'Could not launch WhatsApp';
+        }
       }
+    } catch (e) {
+      debugPrint('WhatsApp launch error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not launch WhatsApp. Make sure the app is installed or try contacting the agent directly.',
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
+  }
 
-      if (!launched) {
-        throw 'Could not launch WhatsApp';
+  // Add a method to make a regular phone call
+  Future<void> _makePhoneCall() async {
+    const phoneNumber = "+916354450316";
+    final Uri uri = Uri.parse("tel:$phoneNumber");
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        throw 'Could not launch phone app';
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not launch WhatsApp: $e'),
+        const SnackBar(
+          content: Text('Could not open phone app'),
           backgroundColor: Colors.red,
         ),
       );
@@ -116,7 +140,7 @@ Thank you!
     final isSmallScreen = screenSize.width < 600;
     final isMediumScreen = screenSize.width >= 600 && screenSize.width < 900;
     final isLargeScreen = screenSize.width >= 900;
-    
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.grey[50],
@@ -135,7 +159,8 @@ Thank you!
         leading: IconButton(
           icon: const Icon(Icons.menu, color: Color(0xFF6A38F2)),
           onPressed: () {
-            _scaffoldKey.currentState?.openDrawer(); // Changed to standard drawer (from top)
+            _scaffoldKey.currentState
+                ?.openDrawer(); // Changed to standard drawer (from top)
           },
         ),
       ),
@@ -148,10 +173,10 @@ Thank you!
               // Back to listings
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  isSmallScreen ? 12 : 16, 
-                  isSmallScreen ? 12 : 16, 
-                  isSmallScreen ? 12 : 16, 
-                  isSmallScreen ? 6 : 8
+                  isSmallScreen ? 12 : 16,
+                  isSmallScreen ? 12 : 16,
+                  isSmallScreen ? 12 : 16,
+                  isSmallScreen ? 6 : 8,
                 ),
                 child: InkWell(
                   onTap: () => Navigator.pop(context),
@@ -195,18 +220,12 @@ Thank you!
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Left column - Property details
-          Expanded(
-            flex: 2,
-            child: _buildPropertyDetailsCard(false),
-          ),
-          
+          Expanded(flex: 2, child: _buildPropertyDetailsCard(false)),
+
           const SizedBox(width: 24),
-          
+
           // Right column - Contact form
-          Expanded(
-            flex: 1,
-            child: _buildContactForm(),
-          ),
+          Expanded(flex: 1, child: _buildContactForm()),
         ],
       ),
     );
@@ -221,9 +240,9 @@ Thank you!
         children: [
           // Property details
           _buildPropertyDetailsCard(isSmallScreen),
-          
+
           SizedBox(height: isSmallScreen ? 16 : 24),
-          
+
           // Contact form
           _buildContactForm(),
         ],
@@ -265,10 +284,7 @@ Thank you!
                 const SizedBox(height: 8),
                 Text(
                   '${widget.property.address}, ${widget.property.city}, ${widget.property.state} ${widget.property.zipCode}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 12),
                 // Tags
@@ -343,7 +359,7 @@ Thank you!
               ),
             ),
           ),
-          
+
           // Thumbnail gallery
           if (widget.property.images.length > 1) ...[
             Container(
@@ -365,9 +381,10 @@ Thank you!
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _activeImageIndex == index
-                              ? const Color(0xFF6A38F2)
-                              : Colors.transparent,
+                          color:
+                              _activeImageIndex == index
+                                  ? const Color(0xFF6A38F2)
+                                  : Colors.transparent,
                           width: 2,
                         ),
                         image: DecorationImage(
@@ -460,7 +477,7 @@ Thank you!
   // Contact form card
   Widget _buildContactForm() {
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
-    
+
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       decoration: BoxDecoration(
@@ -536,7 +553,7 @@ Thank you!
           ),
 
           const SizedBox(height: 16),
-          
+
           // Phone number field
           const Text(
             'Phone Number',
@@ -586,36 +603,64 @@ Thank you!
               fillColor: Colors.grey[100],
             ),
           ),
-          
+
           const SizedBox(height: 16),
 
-          // Send Message button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _sendWhatsAppMessage,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6A38F2),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.message, size: 20),
-                  SizedBox(width: 8),
-                  Text('Contact via WhatsApp'),
-                ],
-              ),
-            ),
-          ),
+          // Add the contact buttons to the bottom of the form
+          _buildContactButtons(),
         ],
       ),
     );
   }
 
+  // Add the contact buttons to the bottom of the form
+  Widget _buildContactButtons() {
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          'Contact the agent directly:',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            // WhatsApp button
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _sendWhatsAppMessage,
+                icon: const Icon(Icons.message),
+                label: const Text('WhatsApp'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366), // WhatsApp green
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Call button
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _makePhoneCall,
+                icon: const Icon(Icons.phone),
+                label: const Text('Call'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6A38F2), // DreamHome purple
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildPropertyDetail(IconData icon, String label, String value) {
     final isSmallScreen = MediaQuery.of(context).size.width < 600;
-    
+
     return SizedBox(
       width: isSmallScreen ? double.infinity : null,
       child: Row(
@@ -627,11 +672,7 @@ Thank you!
               color: Colors.indigo[50],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFF6A38F2),
-              size: 20,
-            ),
+            child: Icon(icon, color: const Color(0xFF6A38F2), size: 20),
           ),
           const SizedBox(width: 12),
           Column(
