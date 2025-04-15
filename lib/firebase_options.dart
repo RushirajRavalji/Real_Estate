@@ -27,10 +27,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return web; // Use web config for Windows
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -43,42 +40,41 @@ class DefaultFirebaseOptions {
     }
   }
 
-  // Replace these placeholder values with your actual Firebase configuration
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    authDomain: 'YOUR_AUTH_DOMAIN',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    measurementId: 'YOUR_MEASUREMENT_ID',
+    apiKey: "AIzaSyAG4C5XG1fXPQevAUW-NmcoZTlcIv2srFY",
+    authDomain: "real-estate-d048f.firebaseapp.com",
+    projectId: "real-estate-d048f",
+    storageBucket: "real-estate-d048f.firebasestorage.app",
+    messagingSenderId: "929916563236",
+    appId: "1:929916563236:web:05e752324d56132a2e4db1",
+    measurementId: "G-KKLZ8EQ0Q2",
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
+    apiKey: "AIzaSyAG4C5XG1fXPQevAUW-NmcoZTlcIv2srFY",
+    appId: "1:929916563236:web:05e752324d56132a2e4db1",
+    messagingSenderId: "929916563236",
+    projectId: "real-estate-d048f",
+    storageBucket: "real-estate-d048f.firebasestorage.app",
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    iosBundleId: 'YOUR_IOS_BUNDLE_ID',
+    apiKey: "AIzaSyAG4C5XG1fXPQevAUW-NmcoZTlcIv2srFY",
+    appId: "1:929916563236:web:05e752324d56132a2e4db1",
+    messagingSenderId: "929916563236",
+    projectId: "real-estate-d048f",
+    storageBucket: "real-estate-d048f.firebasestorage.app",
+    iosClientId: "929916563236-app.googleusercontent.com",
+    iosBundleId: "com.example.realEstateApp",
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    iosBundleId: 'YOUR_IOS_BUNDLE_ID',
+    apiKey: "AIzaSyAG4C5XG1fXPQevAUW-NmcoZTlcIv2srFY",
+    appId: "1:929916563236:web:05e752324d56132a2e4db1",
+    messagingSenderId: "929916563236",
+    projectId: "real-estate-d048f",
+    storageBucket: "real-estate-d048f.firebasestorage.app",
+    iosClientId: "929916563236-app.googleusercontent.com",
+    iosBundleId: "com.example.realEstateApp",
   );
 }

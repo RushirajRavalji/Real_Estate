@@ -5,7 +5,9 @@ import '../widgets/app_drawer.dart';
 import 'property_detail_screen.dart';
 
 class PropertyListingScreen extends StatefulWidget {
-  const PropertyListingScreen({Key? key}) : super(key: key);
+  final String? propertyType; // 'rent' or 'sale' or null for all properties
+
+  const PropertyListingScreen({Key? key, this.propertyType}) : super(key: key);
 
   @override
   State<PropertyListingScreen> createState() => _PropertyListingScreenState();
@@ -14,6 +16,19 @@ class PropertyListingScreen extends StatefulWidget {
 class _PropertyListingScreenState extends State<PropertyListingScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final PropertyService _propertyService = PropertyService();
+
+  // Get the correct stream based on property type
+  Stream<List<Property>> _getFilteredPropertiesStream() {
+    if (widget.propertyType != null) {
+      debugPrint(
+        'Getting properties stream filtered by type: ${widget.propertyType}',
+      );
+      return _propertyService.getPropertiesByTypeStream(widget.propertyType!);
+    } else {
+      debugPrint('Getting all properties stream');
+      return _propertyService.getPropertiesStream();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,9 +42,13 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
       key: _scaffoldKey,
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          'DreamHome',
-          style: TextStyle(
+        title: Text(
+          widget.propertyType == 'rent'
+              ? 'Properties for Rent'
+              : widget.propertyType == 'sale'
+              ? 'Properties for Sale'
+              : 'Properties',
+          style: const TextStyle(
             color: Color(0xFF6A38F2),
             fontWeight: FontWeight.bold,
             fontSize: 20,
@@ -49,7 +68,7 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
       drawer: const AppDrawer(), // Changed to standard drawer (from top)
       body: SafeArea(
         child: StreamBuilder<List<Property>>(
-          stream: _propertyService.getPropertiesStream(),
+          stream: _getFilteredPropertiesStream(),
           builder: (context, snapshot) {
             debugPrint(
               'Property listing stream state: ${snapshot.connectionState}',
@@ -171,7 +190,7 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
     );
   }
 
-  // Property card for list view
+  // Property card for list view with overflow protection
   Widget _buildPropertyCard(BuildContext context, Property property) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16, left: 12, right: 12),
@@ -235,12 +254,12 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
                           'Featured',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    const SizedBox(width: 8),
+                    if (property.isFeatured) const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -257,7 +276,7 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
                         property.type == 'sale' ? 'For Sale' : 'For Rent',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -310,7 +329,7 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 8),
                   child: Text(
-                    '${property.address}, ${property.city}, ${property.state} ${property.zipCode}',
+                    '${property.address}, ${property.city}',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -337,47 +356,42 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
                   children: [
                     _buildFeature(
                       Icons.king_bed_outlined,
-                      '${property.bedrooms} Beds',
+                      '${property.bedrooms}',
                     ),
                     _buildFeature(
                       Icons.bathtub_outlined,
-                      '${property.bathrooms} Baths',
+                      '${property.bathrooms}',
                     ),
                     _buildFeature(
                       Icons.straighten_outlined,
-                      '${property.squareFeet} sqft',
+                      '${property.squareFeet}',
                     ),
                   ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // View Details Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) =>
-                                  PropertyDetailScreen(property: property),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6A38F2),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('View Details'),
-                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Compact feature display to prevent overflow
+  Widget _buildFeature(IconData icon, String value) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.grey[700], size: 18),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.grey[700],
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      ],
     );
   }
 
@@ -563,16 +577,6 @@ class _PropertyListingScreenState extends State<PropertyListingScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFeature(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey[600]),
-        const SizedBox(width: 4),
-        Text(text, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
-      ],
     );
   }
 

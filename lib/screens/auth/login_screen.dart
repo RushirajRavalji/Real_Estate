@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../home_screen.dart';
 import 'signup_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -27,6 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    // Close keyboard
+    FocusScope.of(context).unfocus();
+
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -34,30 +38,72 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        // Sign in with email and password
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
+        debugPrint(
+          'Attempting to sign in with email: ${_emailController.text.trim()}',
         );
 
-        // Save login state
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
+        // Use a try-catch block specifically for the Firebase authentication
+        try {
+          // Sign in with email and password
+          final userCredential = await FirebaseAuth.instance
+              .signInWithEmailAndPassword(
+                email: _emailController.text.trim(),
+                password: _passwordController.text,
+              );
 
-        // Navigate to home screen
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
+          debugPrint(
+            'Sign in successful. User ID: ${userCredential.user?.uid}',
           );
+
+          // Save login state only if we have a valid user
+          if (userCredential.user != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('isLoggedIn', true);
+            debugPrint('Login state saved to SharedPreferences');
+
+            // Navigate to home screen
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+                (route) => false,
+              );
+            }
+          }
+        } catch (firebaseError) {
+          debugPrint(
+            'Caught Firebase error during authentication: $firebaseError',
+          );
+          rethrow; // Re-throw to be caught by the outer try-catch
         }
       } on FirebaseAuthException catch (e) {
+        debugPrint(
+          'FirebaseAuthException during login: ${e.code} - ${e.message}',
+        );
         setState(() {
-          _errorMessage = e.message ?? 'Authentication failed';
+          switch (e.code) {
+            case 'user-not-found':
+              _errorMessage = 'No user found with this email';
+              break;
+            case 'wrong-password':
+              _errorMessage = 'Invalid password';
+              break;
+            case 'invalid-email':
+              _errorMessage = 'Invalid email format';
+              break;
+            case 'user-disabled':
+              _errorMessage = 'This account has been disabled';
+              break;
+            case 'network-request-failed':
+              _errorMessage = 'Network error. Check your connection';
+              break;
+            default:
+              _errorMessage = e.message ?? 'Authentication failed';
+          }
         });
       } catch (e) {
+        debugPrint('Unexpected error during login: $e');
         setState(() {
-          _errorMessage = 'An unexpected error occurred';
+          _errorMessage = 'An error occurred. Please try again later.';
         });
       } finally {
         if (mounted) {
@@ -263,6 +309,48 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 24),
+
+                    // Test account button (for debugging)
+                    if (true) // Change to false in production
+                      Column(
+                        children: [
+                          const Divider(),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'For Testing Only',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton(
+                            onPressed: () {
+                              _emailController.text = 'test@example.com';
+                              _passwordController.text = 'password123';
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey[600],
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              side: BorderSide(color: Colors.grey[300]!),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text('Use Test Account'),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _createTestAccount,
+                            child: const Text(
+                              'Create Test Account',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -271,5 +359,96 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  // Method to create a test account
+  Future<void> _createTestAccount() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      debugPrint('Creating test account...');
+
+      // Check if test account already exists
+      bool testAccountExists = false;
+      try {
+        final testUserCredential = await FirebaseAuth.instance
+            .signInWithEmailAndPassword(
+              email: 'test@example.com',
+              password: 'password123',
+            );
+
+        if (testUserCredential.user != null) {
+          testAccountExists = true;
+          debugPrint('Test account already exists, signing out...');
+          await FirebaseAuth.instance.signOut();
+        }
+      } catch (e) {
+        // Expected error if user doesn't exist
+        debugPrint('Test account does not exist, will create one');
+      }
+
+      if (testAccountExists) {
+        setState(() {
+          _errorMessage =
+              'Test account already exists. You can use it to log in.';
+          _emailController.text = 'test@example.com';
+          _passwordController.text = 'password123';
+        });
+        return;
+      }
+
+      // Create test user
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: 'test@example.com',
+            password: 'password123',
+          );
+
+      debugPrint('Test user created: ${userCredential.user?.uid}');
+
+      if (userCredential.user != null) {
+        try {
+          // Add user details to Firestore
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .set({
+                'name': 'Test User',
+                'email': 'test@example.com',
+                'phone': '9876543210',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+
+          debugPrint('Test user details added to Firestore');
+        } catch (firestoreError) {
+          debugPrint('Error saving test user to Firestore: $firestoreError');
+        }
+      }
+
+      await FirebaseAuth.instance.signOut();
+
+      setState(() {
+        _errorMessage = 'Test account created successfully!';
+        _emailController.text = 'test@example.com';
+        _passwordController.text = 'password123';
+      });
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Error creating test account: ${e.code} - ${e.message}');
+      setState(() {
+        _errorMessage = 'Error creating test account: ${e.message}';
+      });
+    } catch (e) {
+      debugPrint('Unexpected error creating test account: $e');
+      setState(() {
+        _errorMessage = 'Error creating test account. Please try again.';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 }

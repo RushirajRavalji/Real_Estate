@@ -71,7 +71,10 @@ class AppDrawer extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (context) => const PropertyListingScreen(),
+                            builder:
+                                (context) => const PropertyListingScreen(
+                                  propertyType: 'sale',
+                                ),
                           ),
                         );
                       },
@@ -83,7 +86,10 @@ class AppDrawer extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (context) => const PropertyListingScreen(),
+                            builder:
+                                (context) => const PropertyListingScreen(
+                                  propertyType: 'rent',
+                                ),
                           ),
                         );
                       },

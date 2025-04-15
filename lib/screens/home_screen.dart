@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../widgets/app_drawer.dart';
 import '../services/property_service.dart';
+import '../models/property.dart';
 import 'property_listing_screen.dart';
 import 'property_detail_screen.dart';
 
@@ -32,12 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _minPriceController = TextEditingController();
   final TextEditingController _maxPriceController = TextEditingController();
+  String? _currentFilter;
 
   @override
   void initState() {
     super.initState();
     // Initialize property data when home screen loads
     _initializeData();
+    // Set default filter to null (all properties)
+    _currentFilter = null;
   }
 
   Future<void> _initializeData() async {
@@ -147,7 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   MaterialPageRoute(
                                     builder:
                                         (context) =>
-                                            const PropertyListingScreen(),
+                                            const PropertyListingScreen(
+                                              propertyType: 'sale',
+                                            ),
                                   ),
                                 );
                               },
@@ -180,7 +187,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   MaterialPageRoute(
                                     builder:
                                         (context) =>
-                                            const PropertyListingScreen(),
+                                            const PropertyListingScreen(
+                                              propertyType: 'rent',
+                                            ),
                                   ),
                                 );
                               },
@@ -229,13 +238,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 horizontal: isSmallScreen ? 12.0 : 16.0,
                 vertical: isSmallScreen ? 4.0 : 8.0,
               ),
-              child: Text(
-                'Property Listings',
-                style: TextStyle(
-                  fontSize: isSmallScreen ? 20 : 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Featured Properties',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 20 : 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  // Property type filter
+                  _buildPropertyTypeFilter(),
+                ],
               ),
             ),
 
@@ -568,10 +584,23 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
+          // Determine property type based on the selected filter
+          String? propertyType;
+
+          if (_selectedPropertyType != 'All Properties') {
+            if (_currentFilter == 'For Sale') {
+              propertyType = 'sale';
+            } else if (_currentFilter == 'For Rent') {
+              propertyType = 'rent';
+            }
+          }
+
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const PropertyListingScreen(),
+              builder:
+                  (context) =>
+                      PropertyListingScreen(propertyType: propertyType),
             ),
           );
         },
@@ -590,7 +619,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return SizedBox(
       height: 330,
       child: StreamBuilder(
-        stream: _propertyService.getPropertiesStream(),
+        stream:
+            _currentFilter != null
+                ? _propertyService.getPropertiesByTypeStream(_currentFilter!)
+                : _propertyService.getPropertiesStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -603,7 +635,27 @@ class _HomeScreenState extends State<HomeScreen> {
           final properties = snapshot.data ?? [];
 
           if (properties.isEmpty) {
-            return const Center(child: Text('No properties available'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.home_work_outlined,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _currentFilter == 'rent'
+                        ? 'No rental properties available'
+                        : _currentFilter == 'sale'
+                        ? 'No properties for sale available'
+                        : 'No properties available',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                  ),
+                ],
+              ),
+            );
           }
 
           // Take only the first 3-5 properties
@@ -618,7 +670,7 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: featuredProperties.length,
             itemBuilder: (context, index) {
               final property = featuredProperties[index];
-              return _buildPropertyCard(context, property, isSmallScreen);
+              return _buildPropertyCard(property, isSmallScreen);
             },
           );
         },
@@ -626,12 +678,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Method to build a property card for the horizontal list
-  Widget _buildPropertyCard(
-    BuildContext context,
-    property,
-    bool isSmallScreen,
-  ) {
+  // Property card for the featured section with overflow protection
+  Widget _buildPropertyCard(Property property, bool isSmallScreen) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -643,15 +691,15 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Container(
         width: 280,
-        margin: const EdgeInsets.only(right: 16.0),
+        margin: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12.0),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8.0,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
@@ -731,18 +779,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 8.0),
 
-                  // Property features
+                  // Property features - more compact to avoid overflow
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildFeature(Icons.bed, '${property.bedrooms} Beds'),
-                      _buildFeature(
-                        Icons.bathroom,
-                        '${property.bathrooms} Baths',
-                      ),
+                      _buildFeature(Icons.bed, '${property.bedrooms}'),
+                      _buildFeature(Icons.bathroom, '${property.bathrooms}'),
                       _buildFeature(
                         Icons.square_foot,
-                        '${property.squareFeet} sqft',
+                        '${property.squareFeet}',
                       ),
                     ],
                   ),
@@ -755,14 +800,57 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper method to build a feature item
+  // More compact feature display
   Widget _buildFeature(IconData icon, String text) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16.0, color: Colors.grey[600]),
-        const SizedBox(width: 4.0),
-        Text(text, style: TextStyle(fontSize: 12.0, color: Colors.grey[600])),
+        Icon(icon, size: 16, color: Colors.grey[600]),
+        const SizedBox(width: 4),
+        Text(text, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
       ],
+    );
+  }
+
+  // Method to build property type filter
+  Widget _buildPropertyTypeFilter() {
+    return Row(
+      children: [
+        _buildFilterChip('All', null),
+        const SizedBox(width: 8),
+        _buildFilterChip('For Sale', 'sale'),
+        const SizedBox(width: 8),
+        _buildFilterChip('For Rent', 'rent'),
+      ],
+    );
+  }
+
+  // Method to build a filter chip
+  Widget _buildFilterChip(String label, String? type) {
+    // Add state to track selected filter
+    final isCurrent = _currentFilter == type;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentFilter = type;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isCurrent ? const Color(0xFF6A38F2) : Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: isCurrent ? Colors.white : Colors.black87,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -35,6 +35,9 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _signup() async {
+    // Close keyboard
+    FocusScope.of(context).unfocus();
+
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -42,48 +45,102 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       try {
-        // Create user with email and password
-        final userCredential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-              email: _emailController.text.trim(),
-              password: _passwordController.text,
-            );
+        debugPrint(
+          'Attempting to create user with email: ${_emailController.text.trim()}',
+        );
 
-        // Save user details to Firestore
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userCredential.user!.uid)
-            .set({
-              'name': _nameController.text.trim(),
-              'email': _emailController.text.trim(),
-              'phone': _phoneController.text.trim(),
-              'createdAt': FieldValue.serverTimestamp(),
-            });
+        // Use a try-catch block specifically for the Firebase authentication
+        try {
+          // Create user with email and password
+          final userCredential = await FirebaseAuth.instance
+              .createUserWithEmailAndPassword(
+                email: _emailController.text.trim(),
+                password: _passwordController.text,
+              );
 
-        // Save login state
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
-
-        // Navigate to home screen
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
+          debugPrint(
+            'User created successfully. User ID: ${userCredential.user?.uid}',
           );
+
+          // Save user details to Firestore
+          if (userCredential.user != null) {
+            try {
+              debugPrint('Saving user details to Firestore');
+
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userCredential.user!.uid)
+                  .set({
+                    'name': _nameController.text.trim(),
+                    'email': _emailController.text.trim(),
+                    'phone': _phoneController.text.trim(),
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+
+              debugPrint('User details saved to Firestore');
+
+              // Save login state
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isLoggedIn', true);
+              debugPrint('Login state saved to SharedPreferences');
+
+              // Navigate to home screen
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false,
+                );
+              }
+            } catch (firestoreError) {
+              debugPrint('Error saving to Firestore: $firestoreError');
+              // If Firestore fails, still consider the user registered but show a warning
+              setState(() {
+                _errorMessage =
+                    'Account created but profile data could not be saved. Some features may be limited.';
+              });
+
+              // Navigate to home screen anyway
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false,
+                );
+              }
+            }
+          }
+        } catch (firebaseError) {
+          debugPrint('Caught Firebase error during signup: $firebaseError');
+          rethrow; // Re-throw to be caught by the outer try-catch
         }
       } on FirebaseAuthException catch (e) {
+        debugPrint(
+          'FirebaseAuthException during signup: ${e.code} - ${e.message}',
+        );
         setState(() {
-          if (e.code == 'weak-password') {
-            _errorMessage = 'The password provided is too weak';
-          } else if (e.code == 'email-already-in-use') {
-            _errorMessage = 'An account already exists for that email';
-          } else {
-            _errorMessage = e.message ?? 'Registration failed';
+          switch (e.code) {
+            case 'weak-password':
+              _errorMessage = 'The password provided is too weak';
+              break;
+            case 'email-already-in-use':
+              _errorMessage = 'An account already exists for that email';
+              break;
+            case 'invalid-email':
+              _errorMessage = 'Invalid email format';
+              break;
+            case 'operation-not-allowed':
+              _errorMessage = 'Email/password accounts are not enabled';
+              break;
+            case 'network-request-failed':
+              _errorMessage = 'Network error. Check your connection';
+              break;
+            default:
+              _errorMessage = e.message ?? 'Registration failed';
           }
         });
       } catch (e) {
+        debugPrint('Unexpected error during signup: $e');
         setState(() {
-          _errorMessage = 'An unexpected error occurred';
+          _errorMessage = 'An error occurred. Please try again later.';
         });
       } finally {
         if (mounted) {
